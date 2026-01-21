@@ -10,7 +10,7 @@ import {
   onValue,
   Database,
 } from 'firebase/database';
-import type { Recipe, MealPlan, GroceryItem, GroceryList } from '@/types';
+import type { Recipe, MealPlan, GroceryItem, GroceryList, SavedVideoSearch } from '@/types';
 
 let app: FirebaseApp | null = null;
 let database: Database | null = null;
@@ -318,4 +318,85 @@ export function subscribeToRecipes(callback: (recipes: Recipe[]) => void): () =>
   });
 
   return unsubscribe;
+}
+
+// Video Search Results
+export async function saveVideoSearchResults(search: SavedVideoSearch): Promise<void> {
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized, video search not saved');
+    return;
+  }
+
+  try {
+    const searchesRef = ref(database, `users/${currentUserId}/videoSearches/${search.id}`);
+    await set(searchesRef, search);
+    console.log(`✅ Video search saved to Firebase: "${search.searchQuery}" (${search.resultCount} results)`);
+  } catch (error) {
+    console.error(`❌ Error saving video search "${search.searchQuery}":`, error);
+    throw error;
+  }
+}
+
+export async function loadVideoSearchResults(): Promise<SavedVideoSearch[]> {
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized, returning empty video search list');
+    return [];
+  }
+
+  try {
+    const searchesRef = ref(database, `users/${currentUserId}/videoSearches`);
+    const snapshot = await get(searchesRef);
+
+    if (snapshot.exists()) {
+      const searchesObj = snapshot.val();
+      const searches = Object.values(searchesObj) as SavedVideoSearch[];
+      // Sort by most recent first
+      searches.sort((a, b) => b.createdAt - a.createdAt);
+      console.log(`✅ Loaded ${searches.length} video searches from Firebase`);
+      return searches;
+    }
+
+    console.log('📝 No existing video searches found');
+    return [];
+  } catch (error) {
+    console.error('❌ Error loading video searches from Firebase:', error);
+    return [];
+  }
+}
+
+export async function deleteVideoSearch(searchId: string): Promise<void> {
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized, video search not deleted');
+    return;
+  }
+
+  try {
+    const searchRef = ref(database, `users/${currentUserId}/videoSearches/${searchId}`);
+    await remove(searchRef);
+    console.log(`✅ Video search deleted from Firebase: ${searchId}`);
+  } catch (error) {
+    console.error(`❌ Error deleting video search ${searchId}:`, error);
+    throw error;
+  }
+}
+
+export async function getVideoSearchById(searchId: string): Promise<SavedVideoSearch | null> {
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized');
+    return null;
+  }
+
+  try {
+    const searchRef = ref(database, `users/${currentUserId}/videoSearches/${searchId}`);
+    const snapshot = await get(searchRef);
+
+    if (snapshot.exists()) {
+      return snapshot.val() as SavedVideoSearch;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`❌ Error getting video search ${searchId}:`, error);
+    return null;
+  }
 }

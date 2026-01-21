@@ -139,7 +139,17 @@ export default function HomeScreen() {
 
         {/* URL Input Section */}
         <View style={styles.inputSection}>
-          <Text style={styles.sectionTitle}>Home - Paste Recipe Link</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Home - Paste Recipe Link</Text>
+            <TouchableOpacity
+              style={styles.searchVideosButton}
+              onPress={() => router.push('/video-search')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="search" size={16} color={Colors.primary} />
+              <Text style={styles.searchVideosText}>Search Videos</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -292,11 +302,30 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 20,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.gray[700],
-    marginBottom: 15,
+  },
+  searchVideosButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: `${Colors.primary}10`,
+  },
+  searchVideosText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   inputContainer: {
     position: 'relative',

@@ -1,5 +1,5 @@
 import { generateText } from '@fastshot/ai';
-import type { Recipe, Ingredient, GroceryCategory } from '@/types';
+import type { Recipe, Ingredient, GroceryCategory, VideoSearchResult } from '@/types';
 
 /**
  * Parse a recipe from video content using Newell AI
@@ -19,6 +19,7 @@ ${videoTranscript}
 Extract and return a JSON object with the following structure (respond ONLY with valid JSON, no other text):
 {
   "title": "Recipe name",
+  "description": "Brief recipe description",
   "servings": number,
   "cookTime": number (in minutes),
   "ingredients": [
@@ -28,7 +29,8 @@ Extract and return a JSON object with the following structure (respond ONLY with
       "unit": "unit of measurement (e.g., cup, tsp, lb, oz, or empty string if none)",
       "category": "one of: Produce, Dairy & Eggs, Pantry, Meat & Seafood, Bakery, Beverages, Frozen, Other"
     }
-  ]
+  ],
+  "steps": ["Step 1 description", "Step 2 description", ...]
 }
 
 Important:
@@ -44,12 +46,17 @@ Important:
     const cleanedResponse = response.trim().replace(/```json\n?|\n?```/g, '');
     const parsed = JSON.parse(cleanedResponse);
 
+    // Extract video ID from URL
+    const videoId = extractVideoId(videoUrl);
+
     // Create the recipe object
     const recipe: Recipe = {
       id: generateRecipeId(),
       title: parsed.title,
+      description: parsed.description || '',
       source: videoUrl.includes('youtube') ? 'youtube' : 'tiktok',
       sourceUrl: videoUrl,
+      videoId: videoId,
       servings: parsed.servings || 4,
       cookTime: parsed.cookTime || 30,
       ingredients: parsed.ingredients.map((ing: any, index: number) => ({
@@ -60,6 +67,7 @@ Important:
         category: ing.category as GroceryCategory,
         checked: false,
       })),
+      steps: parsed.steps || [],
       isFavorite: false,
       createdAt: Date.now(),
       parsedAt: Date.now(),
@@ -184,4 +192,117 @@ export async function extractVideoContent(videoUrl: string): Promise<string> {
 // Helper function to generate unique IDs
 function generateRecipeId(): string {
   return `recipe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Extract video ID from YouTube or TikTok URL
+ */
+function extractVideoId(url: string): string | undefined {
+  try {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      // YouTube URL patterns
+      const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+        /youtube\.com\/embed\/([^&\n?#]+)/,
+        /youtube\.com\/v\/([^&\n?#]+)/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+    } else if (url.includes('tiktok.com')) {
+      // TikTok URL pattern
+      const match = url.match(/\/video\/(\d+)/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+  } catch (error) {
+    console.error('Error extracting video ID:', error);
+  }
+  return undefined;
+}
+
+/**
+ * Search for recipe videos on YouTube using Newell AI
+ * @param searchQuery - The search query (e.g., "easy chicken recipes")
+ * @param maxResults - Maximum number of results to return (default: 10)
+ */
+export async function searchRecipeVideos(
+  searchQuery: string,
+  maxResults: number = 10
+): Promise<VideoSearchResult[]> {
+  // Use Newell AI to simulate YouTube search
+  // In production, you would use YouTube Data API v3
+  const prompt = `You are a YouTube recipe video search simulator. Generate ${maxResults} realistic recipe video search results for the query: "${searchQuery}"
+
+Return ONLY a valid JSON array (no other text) with the following structure:
+[
+  {
+    "id": "unique_video_id",
+    "title": "Recipe video title",
+    "channelName": "Channel name",
+    "thumbnailUrl": "https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg",
+    "duration": "MM:SS format (e.g., 10:23)",
+    "viewCount": "formatted view count (e.g., 1.2M, 450K)",
+    "publishedAt": "relative time (e.g., 2 days ago, 1 week ago)",
+    "url": "https://www.youtube.com/watch?v=VIDEO_ID"
+  }
+]
+
+Important:
+- Make the results realistic and relevant to cooking/recipes
+- Use diverse channel names (e.g., Tasty, Bon Appétit, Joshua Weissman, etc.)
+- Vary video durations (5-20 minutes typical for recipes)
+- Make titles descriptive and appealing
+- Ensure thumbnailUrl uses the same VIDEO_ID as in the url`;
+
+  try {
+    const response = await generateText({ prompt });
+    const cleanedResponse = response.trim().replace(/```json\n?|\n?```/g, '');
+    const results = JSON.parse(cleanedResponse);
+
+    return results.slice(0, maxResults);
+  } catch (error) {
+    console.error('Error searching recipe videos:', error);
+
+    // Fallback to mock data
+    return generateMockVideoResults(searchQuery, maxResults);
+  }
+}
+
+/**
+ * Generate mock video search results (fallback)
+ */
+function generateMockVideoResults(searchQuery: string, count: number): VideoSearchResult[] {
+  const channels = [
+    'Tasty',
+    'Bon Appétit',
+    'Joshua Weissman',
+    'Binging with Babish',
+    'Sam the Cooking Guy',
+    'Chef John - Food Wishes',
+    'Eitan Bernath',
+    'Gordon Ramsay',
+  ];
+
+  return Array.from({ length: count }, (_, i) => {
+    const videoId = `video_${Date.now()}_${i}`;
+    const channel = channels[i % channels.length];
+    const duration = `${Math.floor(Math.random() * 15) + 5}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`;
+
+    return {
+      id: videoId,
+      title: `${searchQuery} - ${channel}'s Recipe`,
+      channelName: channel,
+      thumbnailUrl: `https://via.placeholder.com/640x360/E67E22/FFFFFF?text=${encodeURIComponent(searchQuery)}`,
+      duration,
+      viewCount: `${(Math.random() * 5).toFixed(1)}M`,
+      publishedAt: `${Math.floor(Math.random() * 30) + 1} days ago`,
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+    };
+  });
 }
