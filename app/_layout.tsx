@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { GroceryProvider } from '@/contexts/GroceryContext';
+import { RecipeProvider } from '@/contexts/RecipeContext';
 import { initializeFirebase } from '@/services/firebase';
 
 export default function RootLayout() {
@@ -13,8 +14,9 @@ export default function RootLayout() {
 
   return (
     <SubscriptionProvider>
-      <GroceryProvider>
-      <StatusBar style="dark" />
+      <RecipeProvider>
+        <GroceryProvider>
+          <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
@@ -38,8 +40,9 @@ export default function RootLayout() {
             presentation: 'card'
           }}
         />
-      </Stack>
-      </GroceryProvider>
+        </Stack>
+        </GroceryProvider>
+      </RecipeProvider>
     </SubscriptionProvider>
   );
 }

@@ -8,58 +8,29 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
+import { useRecipes } from '@/contexts/RecipeContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
 
 export default function LibraryScreen() {
   const router = useRouter();
+  const { recipes, favoriteRecipes, isLoading, searchRecipes } = useRecipes();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  // Mock data
-  const recipes = [
-    {
-      id: '1',
-      title: "Eitan's Crispy Chicken",
-      imageUrl: 'https://via.placeholder.com/300/E67E22/FFFFFF?text=Crispy+Chicken',
-      isFavorite: true,
-      cookTime: 30,
-    },
-    {
-      id: '2',
-      title: 'Viral Feta Pasta',
-      imageUrl: 'https://via.placeholder.com/300/A4AC86/FFFFFF?text=Feta+Pasta',
-      isFavorite: true,
-      cookTime: 25,
-    },
-    {
-      id: '3',
-      title: 'Speed Ramen',
-      imageUrl: 'https://via.placeholder.com/300/E67E22/FFFFFF?text=Speed+Ramen',
-      isFavorite: false,
-      cookTime: 15,
-    },
-    {
-      id: '4',
-      title: 'Garlic Butter Shrimp',
-      imageUrl: 'https://via.placeholder.com/300/A4AC86/FFFFFF?text=Garlic+Shrimp',
-      isFavorite: false,
-      cookTime: 20,
-    },
-  ];
-
-  const filteredRecipes = recipes.filter((recipe) => {
-    const matchesSearch = recipe.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFavorite = !showFavoritesOnly || recipe.isFavorite;
-    return matchesSearch && matchesFavorite;
-  });
+  // Filter recipes based on search and favorites
+  const displayRecipes = showFavoritesOnly ? favoriteRecipes : recipes;
+  const filteredRecipes = searchQuery
+    ? searchRecipes(searchQuery).filter((recipe) => !showFavoritesOnly || recipe.isFavorite)
+    : displayRecipes;
 
   const handleRecipePress = (recipeId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -119,43 +90,67 @@ export default function LibraryScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.grid}>
-          {filteredRecipes.map((recipe) => (
-            <TouchableOpacity
-              key={recipe.id}
-              style={styles.recipeCard}
-              onPress={() => handleRecipePress(recipe.id)}
-              activeOpacity={0.9}
-            >
-              <Image source={{ uri: recipe.imageUrl }} style={styles.recipeImage} />
-              {recipe.isFavorite && (
-                <View style={styles.favoriteBadge}>
-                  <Ionicons name="star" size={16} color={Colors.white} />
-                </View>
-              )}
-              <View style={styles.recipeInfo}>
-                <Text style={styles.recipeTitle} numberOfLines={2}>
-                  {recipe.title}
-                </Text>
-                <View style={styles.cookTimeContainer}>
-                  <Ionicons name="time-outline" size={14} color={Colors.gray[500]} />
-                  <Text style={styles.cookTimeText}>{recipe.cookTime} min</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {filteredRecipes.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="search" size={64} color={Colors.gray[300]} />
-            <Text style={styles.emptyStateTitle}>No recipes found</Text>
-            <Text style={styles.emptyStateText}>
-              {showFavoritesOnly
-                ? 'You have no favorite recipes yet'
-                : 'Try a different search term'}
-            </Text>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Loading recipes...</Text>
           </View>
+        ) : (
+          <>
+            <View style={styles.grid}>
+              {filteredRecipes.map((recipe) => (
+                <TouchableOpacity
+                  key={recipe.id}
+                  style={styles.recipeCard}
+                  onPress={() => handleRecipePress(recipe.id)}
+                  activeOpacity={0.9}
+                >
+                  <Image
+                    source={{
+                      uri: recipe.imageUrl || 'https://via.placeholder.com/300/E67E22/FFFFFF?text=Recipe',
+                    }}
+                    style={styles.recipeImage}
+                  />
+                  {recipe.isFavorite && (
+                    <View style={styles.favoriteBadge}>
+                      <Ionicons name="star" size={16} color={Colors.white} />
+                    </View>
+                  )}
+                  <View style={styles.recipeInfo}>
+                    <Text style={styles.recipeTitle} numberOfLines={2}>
+                      {recipe.title}
+                    </Text>
+                    {recipe.cookTime && (
+                      <View style={styles.cookTimeContainer}>
+                        <Ionicons name="time-outline" size={14} color={Colors.gray[500]} />
+                        <Text style={styles.cookTimeText}>{recipe.cookTime} min</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {filteredRecipes.length === 0 && !isLoading && (
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name={recipes.length === 0 ? 'book-outline' : 'search'}
+                  size={64}
+                  color={Colors.gray[300]}
+                />
+                <Text style={styles.emptyStateTitle}>
+                  {recipes.length === 0 ? 'No Recipes Yet' : 'No recipes found'}
+                </Text>
+                <Text style={styles.emptyStateText}>
+                  {recipes.length === 0
+                    ? 'Start by parsing a recipe from YouTube or TikTok on the Home tab!'
+                    : showFavoritesOnly
+                    ? 'You have no favorite recipes yet. Tap the heart icon on any recipe to save it!'
+                    : 'Try a different search term'}
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -288,10 +283,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.gray[500],
   },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 100,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: Colors.gray[600],
+  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 40,
   },
   emptyStateTitle: {
     fontSize: 18,

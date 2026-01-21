@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import * as Haptics from 'expo-haptics';
 import type { GroceryList, GroceryItem, Ingredient, GroceryCategory } from '@/types';
+import { saveGroceryListToFirebase, loadGroceryListFromFirebase } from '@/services/firebase';
 
 interface GroceryContextType {
   groceryList: GroceryList;
+  isLoading: boolean;
   addRecipeToGroceryList: (recipeId: string, recipeTitle: string, ingredients: Ingredient[]) => void;
   addIngredientToGroceryList: (item: GroceryItem) => void;
   removeIngredientFromGroceryList: (category: GroceryCategory, itemId: string) => void;
@@ -12,44 +15,93 @@ interface GroceryContextType {
   clearAllItems: () => void;
   getItemCount: () => number;
   getCheckedCount: () => number;
+  refreshFromFirebase: () => Promise<void>;
 }
 
 const GroceryContext = createContext<GroceryContextType | undefined>(undefined);
 
 export function GroceryProvider({ children }: { children: ReactNode }) {
   const [groceryList, setGroceryList] = useState<GroceryList>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load grocery list from Firebase on mount
+  useEffect(() => {
+    loadGroceryList();
+  }, []);
+
+  const loadGroceryList = async () => {
+    try {
+      setIsLoading(true);
+      const loadedList = await loadGroceryListFromFirebase();
+      if (loadedList) {
+        setGroceryList(loadedList);
+      }
+    } catch (error) {
+      console.error('Error loading grocery list:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshFromFirebase = async () => {
+    await loadGroceryList();
+  };
+
+  // Persist to Firebase whenever grocery list changes
+  useEffect(() => {
+    if (!isLoading) {
+      saveGroceryListToFirebase(groceryList);
+    }
+  }, [groceryList, isLoading]);
 
   const addRecipeToGroceryList = (
     recipeId: string,
     recipeTitle: string,
     ingredients: Ingredient[]
   ) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     setGroceryList((prev) => {
       const newList = { ...prev };
 
       ingredients.forEach((ingredient) => {
+        // Preserve AI-assigned category, fallback to 'Other'
         const category = ingredient.category || 'Other';
+
+        // Normalize ingredient name for better duplicate detection
+        const normalizedName = ingredient.name.trim().toLowerCase();
+
         const groceryItem: GroceryItem = {
           ...ingredient,
+          id: ingredient.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           recipeId,
           recipeTitle,
           checked: false,
         };
 
+        // Initialize category if it doesn't exist
         if (!newList[category]) {
           newList[category] = [];
         }
 
-        // Check if item already exists (same name from same recipe)
+        // Smart duplicate detection: check for same ingredient name (case-insensitive)
+        // across the same recipe ID to combine quantities
         const existingIndex = newList[category]!.findIndex(
-          (item) => item.name === ingredient.name && item.recipeId === recipeId
+          (item) =>
+            item.name.trim().toLowerCase() === normalizedName &&
+            item.recipeId === recipeId &&
+            item.unit === ingredient.unit // Only merge if same unit
         );
 
         if (existingIndex >= 0) {
-          // Update quantity of existing item
-          newList[category]![existingIndex].quantity += ingredient.quantity;
+          // Merge: combine quantities while preserving category and recipe source
+          const existingItem = newList[category]![existingIndex];
+          newList[category]![existingIndex] = {
+            ...existingItem,
+            quantity: existingItem.quantity + ingredient.quantity,
+          };
         } else {
-          // Add new item
+          // Add as new item, preserving all AI-assigned attributes
           newList[category]!.push(groceryItem);
         }
       });
@@ -85,11 +137,13 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
   };
 
   const removeIngredientFromGroceryList = (category: GroceryCategory, itemId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     setGroceryList((prev) => {
       const newList = { ...prev };
       if (newList[category]) {
         newList[category] = newList[category]!.filter((item) => item.id !== itemId);
-        // Remove empty categories
+        // Remove empty categories for cleaner UI
         if (newList[category]!.length === 0) {
           delete newList[category];
         }
@@ -131,6 +185,8 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
   };
 
   const clearCheckedItems = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
     setGroceryList((prev) => {
       const newList: GroceryList = {};
       Object.keys(prev).forEach((key) => {
@@ -146,6 +202,7 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
   };
 
   const clearAllItems = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     setGroceryList({});
   };
 
@@ -167,6 +224,7 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
     <GroceryContext.Provider
       value={{
         groceryList,
+        isLoading,
         addRecipeToGroceryList,
         addIngredientToGroceryList,
         removeIngredientFromGroceryList,
@@ -176,6 +234,7 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
         clearAllItems,
         getItemCount,
         getCheckedCount,
+        refreshFromFirebase,
       }}
     >
       {children}

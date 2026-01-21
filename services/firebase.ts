@@ -10,7 +10,7 @@ import {
   onValue,
   Database,
 } from 'firebase/database';
-import type { Recipe, MealPlan, GroceryItem } from '@/types';
+import type { Recipe, MealPlan, GroceryItem, GroceryList } from '@/types';
 
 let app: FirebaseApp | null = null;
 let database: Database | null = null;
@@ -105,8 +105,39 @@ export async function updateRecipeFavorite(
   await update(recipeRef, { isFavorite });
 }
 
-// Grocery List
+// Grocery List - Categorized structure
+export async function saveGroceryListToFirebase(groceryList: GroceryList): Promise<void> {
+  if (!database) return;
+
+  try {
+    const groceryRef = ref(database, `users/${currentUserId}/groceryList`);
+    await set(groceryRef, groceryList);
+  } catch (error) {
+    console.error('Error saving grocery list to Firebase:', error);
+  }
+}
+
+export async function loadGroceryListFromFirebase(): Promise<GroceryList | null> {
+  if (!database) return null;
+
+  try {
+    const groceryRef = ref(database, `users/${currentUserId}/groceryList`);
+    const snapshot = await get(groceryRef);
+
+    if (snapshot.exists()) {
+      return snapshot.val() as GroceryList;
+    }
+
+    return {};
+  } catch (error) {
+    console.error('Error loading grocery list from Firebase:', error);
+    return null;
+  }
+}
+
+// Legacy support - keep for backward compatibility
 export async function saveGroceryList(items: GroceryItem[]): Promise<void> {
+  console.warn('saveGroceryList is deprecated. Use saveGroceryListToFirebase instead.');
   if (!database) return;
 
   const groceryRef = ref(database, `users/${currentUserId}/groceryList`);
@@ -114,6 +145,7 @@ export async function saveGroceryList(items: GroceryItem[]): Promise<void> {
 }
 
 export async function getGroceryList(): Promise<GroceryItem[]> {
+  console.warn('getGroceryList is deprecated. Use loadGroceryListFromFirebase instead.');
   if (!database) return [];
 
   const groceryRef = ref(database, `users/${currentUserId}/groceryList`);
@@ -130,27 +162,61 @@ export async function getGroceryList(): Promise<GroceryItem[]> {
 export async function saveMealPlan(mealPlan: MealPlan): Promise<void> {
   if (!database) return;
 
-  const mealPlanRef = ref(database, `users/${currentUserId}/mealPlans/${mealPlan.date}`);
-  await set(mealPlanRef, mealPlan);
+  try {
+    const mealPlanRef = ref(database, `users/${currentUserId}/mealPlans/${mealPlan.date}`);
+    await set(mealPlanRef, mealPlan);
+  } catch (error) {
+    console.error('Error saving meal plan to Firebase:', error);
+  }
 }
 
 export async function getMealPlans(startDate: string, endDate: string): Promise<MealPlan[]> {
   if (!database) return [];
 
-  const mealPlansRef = ref(database, `users/${currentUserId}/mealPlans`);
-  const snapshot = await get(mealPlansRef);
+  try {
+    const mealPlansRef = ref(database, `users/${currentUserId}/mealPlans`);
+    const snapshot = await get(mealPlansRef);
 
-  if (snapshot.exists()) {
-    const plansObj = snapshot.val();
-    const plans = Object.values(plansObj) as MealPlan[];
+    if (snapshot.exists()) {
+      const plansObj = snapshot.val();
+      const plans = Object.values(plansObj) as MealPlan[];
 
-    // Filter by date range
-    return plans.filter(
-      (plan) => plan.date >= startDate && plan.date <= endDate
-    );
+      // Filter by date range
+      return plans.filter(
+        (plan) => plan.date >= startDate && plan.date <= endDate
+      );
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Error loading meal plans from Firebase:', error);
+    return [];
   }
+}
 
-  return [];
+export async function saveWeeklyMealPlans(plans: MealPlan[]): Promise<void> {
+  if (!database) return;
+
+  try {
+    const updates: { [key: string]: MealPlan } = {};
+    plans.forEach((plan) => {
+      updates[`users/${currentUserId}/mealPlans/${plan.date}`] = plan;
+    });
+    await update(ref(database), updates);
+  } catch (error) {
+    console.error('Error saving weekly meal plans to Firebase:', error);
+  }
+}
+
+export async function deleteMealPlan(date: string): Promise<void> {
+  if (!database) return;
+
+  try {
+    const mealPlanRef = ref(database, `users/${currentUserId}/mealPlans/${date}`);
+    await remove(mealPlanRef);
+  } catch (error) {
+    console.error('Error deleting meal plan from Firebase:', error);
+  }
 }
 
 // User Preferences

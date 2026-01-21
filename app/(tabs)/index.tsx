@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
 import { parseRecipeFromVideo, extractVideoContent } from '@/services/newell';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import type { Recipe } from '@/types';
+import { useRecipes } from '@/contexts/RecipeContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.4;
@@ -26,27 +26,17 @@ const CARD_WIDTH = width * 0.4;
 export default function HomeScreen() {
   const router = useRouter();
   const { canParse, isPremium, parsesUsed, parsesLimit, incrementParseCount } = useSubscription();
+  const { addRecipe, recipes } = useRecipes();
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
-  const [parsedRecipe, setParsedRecipe] = useState<Recipe | null>(null);
-  const [recentRecipes, setRecentRecipes] = useState([
-    {
-      id: '1',
-      title: "Eitan's Crispy Chicken",
-      imageUrl: 'https://via.placeholder.com/400x300/E67E22/FFFFFF?text=Crispy+Chicken',
-    },
-    {
-      id: '2',
-      title: 'Viral Feta Pasta',
-      imageUrl: 'https://via.placeholder.com/400x300/A4AC86/FFFFFF?text=Feta+Pasta',
-    },
-    {
-      id: '3',
-      title: 'Speed Ramen',
-      imageUrl: 'https://via.placeholder.com/400x300/E67E22/FFFFFF?text=Speed+Ramen',
-    },
-  ]);
+
+  // Get recent recipes from context (latest 3)
+  const recentRecipes = recipes.slice(0, 3).map((recipe) => ({
+    id: recipe.id,
+    title: recipe.title,
+    imageUrl: recipe.imageUrl || 'https://via.placeholder.com/400x300/E67E22/FFFFFF?text=Recipe',
+  }));
 
   const handleParse = async () => {
     if (!url.trim()) return;
@@ -90,17 +80,22 @@ export default function HomeScreen() {
       setLoadingMessage('Analyzing recipe with AI...');
       const recipe = await parseRecipeFromVideo(url, videoContent);
 
-      // Store parsed recipe
-      setParsedRecipe(recipe);
+      // Save recipe to Firebase via RecipeContext
+      setLoadingMessage('Saving recipe...');
+      await addRecipe(recipe);
 
       // Increment parse count for free users
-      incrementParseCount();
+      await incrementParseCount();
 
       // Success haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Navigate to recipe details
-      router.push(`/recipe/${recipe.id}`);
+      // Show success alert
+      Alert.alert(
+        'Recipe Parsed Successfully!',
+        `"${recipe.title}" has been added to your library.`,
+        [{ text: 'View Recipe', onPress: () => router.push(`/recipe/${recipe.id}`) }]
+      );
 
       // Clear URL input
       setUrl('');

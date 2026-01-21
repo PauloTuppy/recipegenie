@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,8 +14,6 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
 import { useGrocery } from '@/contexts/GroceryContext';
 import type { Ingredient } from '@/types';
-
-const { width } = Dimensions.get('window');
 
 type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
 
@@ -31,11 +28,11 @@ interface DayMeals {
 
 export default function PlannerScreen() {
   const router = useRouter();
-  const { addRecipeToGroceryList, getItemCount } = useGrocery();
+  const { addRecipeToGroceryList } = useGrocery();
   const [selectedDay, setSelectedDay] = useState(0);
 
   // Mock meal plan data for the week
-  const [weekData, setWeekData] = useState<DayMeals[]>([
+  const [weekData] = useState<DayMeals[]>([
     {
       date: 'Mon',
       dayName: 'Monday',

@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
 import { useGrocery } from '@/contexts/GroceryContext';
+import { useRecipes } from '@/contexts/RecipeContext';
 import type { Ingredient } from '@/types';
 
 const { width } = Dimensions.get('window');
@@ -23,7 +24,11 @@ export default function RecipeDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const { addRecipeToGroceryList } = useGrocery();
-  const [isFavorite, setIsFavorite] = useState(false);
+  const { getRecipeById, toggleFavorite } = useRecipes();
+
+  // Get recipe from context
+  const recipeFromContext = getRecipeById(params.id || '');
+  const [isFavorite, setIsFavorite] = useState(recipeFromContext?.isFavorite || false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     {
       id: '1',
@@ -81,9 +86,20 @@ export default function RecipeDetailScreen() {
     router.back();
   };
 
-  const handleFavorite = () => {
+  const handleFavorite = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsFavorite(!isFavorite);
+
+    try {
+      // Optimistically update UI
+      setIsFavorite(!isFavorite);
+
+      // Update in Firebase via RecipeContext
+      await toggleFavorite(params.id || '');
+    } catch {
+      // Revert on error
+      setIsFavorite(!isFavorite);
+      Alert.alert('Error', 'Failed to update favorite status');
+    }
   };
 
   const handleIngredientCheck = (id: string) => {
