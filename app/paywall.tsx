@@ -221,8 +221,12 @@ export default function PaywallScreen() {
           </View>
         ) : (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>No subscription options available</Text>
-            <Text style={styles.errorSubtext}>Please check your internet connection</Text>
+            <Ionicons name="construct-outline" size={48} color={Colors.gray[400]} />
+            <Text style={styles.errorText}>Subscriptions Coming Soon</Text>
+            <Text style={styles.errorSubtext}>
+              Premium features are being set up.{'\n'}
+              You can still enjoy 2 free recipe parses per week!
+            </Text>
           </View>
         )}
 

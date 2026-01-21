@@ -10,19 +10,37 @@ const ENTITLEMENT_ID = 'premium';
 export async function initializeRevenueCat() {
   const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 
-  if (!apiKey || apiKey === 'your_revenuecat_api_key_here') {
-    console.warn('⚠️ RevenueCat API key not configured. Subscription features will be disabled.');
-    console.warn('💡 Please set EXPO_PUBLIC_REVENUECAT_API_KEY in your environment variables.');
+  // Check if API key is configured
+  if (!apiKey || apiKey === 'your_revenuecat_api_key_here' || apiKey === 'not_configured') {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📋 RevenueCat Status: NOT CONFIGURED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('ℹ️  App running in FREE TIER mode');
+    console.log('   • 2 recipe parses per week available');
+    console.log('   • Paywall will display with placeholder pricing');
+    console.log('   • Purchases disabled until RevenueCat is configured');
+    console.log('');
+    console.log('📝 To enable subscriptions:');
+    console.log('   1. Get RevenueCat Public API key (appl_... or goog_...)');
+    console.log('   2. Set EXPO_PUBLIC_REVENUECAT_API_KEY in .env');
+    console.log('   3. Restart the app');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return false;
   }
 
   try {
     await Purchases.configure({ apiKey });
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ RevenueCat initialized successfully');
-    console.log('🔑 Using API key:', apiKey.substring(0, 10) + '...');
+    console.log('🔑 Using API key:', apiKey.substring(0, 15) + '...');
+    console.log('💎 Subscriptions enabled');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return true;
   } catch (error) {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ Failed to initialize RevenueCat:', error);
+    console.log('ℹ️  Falling back to FREE TIER mode');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return false;
   }
 }

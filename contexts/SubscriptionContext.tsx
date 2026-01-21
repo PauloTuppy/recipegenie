@@ -52,7 +52,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setIsPremium(premiumStatus);
         console.log(`💎 Premium status: ${premiumStatus ? 'Active' : 'Inactive'}`);
       } else {
-        console.log('⚠️ RevenueCat not initialized, defaulting to free tier');
+        console.log('📱 App Mode: FREE TIER');
+        console.log('   All core features available:');
+        console.log('   ✓ Recipe parsing (2 per week)');
+        console.log('   ✓ Recipe library');
+        console.log('   ✓ Grocery lists');
+        console.log('   ✓ Meal planning');
+        console.log('   ✓ Video search');
         setIsPremium(false);
       }
 
