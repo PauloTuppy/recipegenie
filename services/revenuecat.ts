@@ -10,17 +10,19 @@ const ENTITLEMENT_ID = 'premium';
 export async function initializeRevenueCat() {
   const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 
-  if (!apiKey) {
-    console.warn('RevenueCat API key not found. Subscription features will be disabled.');
+  if (!apiKey || apiKey === 'your_revenuecat_api_key_here') {
+    console.warn('⚠️ RevenueCat API key not configured. Subscription features will be disabled.');
+    console.warn('💡 Please set EXPO_PUBLIC_REVENUECAT_API_KEY in your environment variables.');
     return false;
   }
 
   try {
     await Purchases.configure({ apiKey });
-    console.log('RevenueCat initialized successfully');
+    console.log('✅ RevenueCat initialized successfully');
+    console.log('🔑 Using API key:', apiKey.substring(0, 10) + '...');
     return true;
   } catch (error) {
-    console.error('Failed to initialize RevenueCat:', error);
+    console.error('❌ Failed to initialize RevenueCat:', error);
     return false;
   }
 }
@@ -56,9 +58,18 @@ export async function purchasePackage(
 export async function checkPremiumStatus(): Promise<boolean> {
   try {
     const customerInfo = await Purchases.getCustomerInfo();
-    return customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+    const isPremium = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+
+    if (isPremium) {
+      console.log('✨ Premium access active');
+    } else {
+      console.log('🔓 Free tier active');
+    }
+
+    return isPremium;
   } catch (error) {
-    console.error('Error checking premium status:', error);
+    console.error('❌ Error checking premium status:', error);
+    // Default to free tier on error for safety
     return false;
   }
 }

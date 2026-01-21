@@ -50,6 +50,11 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
   // Persist to Firebase whenever grocery list changes
   useEffect(() => {
     if (!isLoading) {
+      const itemCount = Object.values(groceryList).reduce(
+        (sum, items) => sum + (items?.length || 0),
+        0
+      );
+      console.log(`💾 Persisting grocery list to Firebase (${itemCount} items)`);
       saveGroceryListToFirebase(groceryList);
     }
   }, [groceryList, isLoading]);
@@ -61,8 +66,12 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
   ) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    console.log(`🛒 Adding recipe to grocery list: "${recipeTitle}" (${ingredients.length} ingredients)`);
+
     setGroceryList((prev) => {
       const newList = { ...prev };
+      let mergedCount = 0;
+      let addedCount = 0;
 
       ingredients.forEach((ingredient) => {
         // Preserve AI-assigned category, fallback to 'Other'
@@ -96,15 +105,31 @@ export function GroceryProvider({ children }: { children: ReactNode }) {
         if (existingIndex >= 0) {
           // Merge: combine quantities while preserving category and recipe source
           const existingItem = newList[category]![existingIndex];
+          const oldQuantity = existingItem.quantity;
+          const newQuantity = oldQuantity + ingredient.quantity;
+
           newList[category]![existingIndex] = {
             ...existingItem,
-            quantity: existingItem.quantity + ingredient.quantity,
+            quantity: newQuantity,
           };
+
+          console.log(
+            `🔄 Merged: "${ingredient.name}" in ${category} (${oldQuantity} → ${newQuantity} ${ingredient.unit})`
+          );
+          mergedCount++;
         } else {
           // Add as new item, preserving all AI-assigned attributes
           newList[category]!.push(groceryItem);
+          console.log(
+            `✅ Added: "${ingredient.name}" to ${category} (${ingredient.quantity} ${ingredient.unit})`
+          );
+          addedCount++;
         }
       });
+
+      console.log(
+        `📊 Grocery list updated: ${addedCount} added, ${mergedCount} merged from "${recipeTitle}"`
+      );
 
       return newList;
     });

@@ -41,12 +41,20 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const initializeSubscription = async () => {
     setIsLoading(true);
     try {
-      // Initialize RevenueCat
-      await initializeRevenueCat();
+      console.log('🔄 Initializing subscription system...');
 
-      // Check premium status
-      const premiumStatus = await checkPremiumStatus();
-      setIsPremium(premiumStatus);
+      // Initialize RevenueCat
+      const rcInitialized = await initializeRevenueCat();
+
+      if (rcInitialized) {
+        // Check premium status
+        const premiumStatus = await checkPremiumStatus();
+        setIsPremium(premiumStatus);
+        console.log(`💎 Premium status: ${premiumStatus ? 'Active' : 'Inactive'}`);
+      } else {
+        console.log('⚠️ RevenueCat not initialized, defaulting to free tier');
+        setIsPremium(false);
+      }
 
       // Load parse count from AsyncStorage
       const storedParses = await AsyncStorage.getItem(STORAGE_KEYS.PARSES_USED);
@@ -56,6 +64,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const lastResetDate = storedResetDate || '';
 
+      console.log(`📅 Last reset date: ${lastResetDate || 'Never'}`);
+      console.log(`📅 Current date: ${currentDate}`);
+
       // Calculate days since last reset
       if (lastResetDate) {
         const daysSinceReset = Math.floor(
@@ -63,21 +74,39 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
             (1000 * 60 * 60 * 24)
         );
 
+        console.log(`⏰ Days since last reset: ${daysSinceReset}`);
+
         // Reset counter if 7+ days have passed (weekly reset)
         if (daysSinceReset >= 7) {
+          console.log('🔄 Weekly limit reached, resetting parse counter');
           await resetWeeklyParses();
         } else {
-          // Load stored parse count
+          // Load stored parse count with validation
           if (storedParses) {
-            setParsesUsed(parseInt(storedParses, 10));
+            const parsedCount = parseInt(storedParses, 10);
+            // Ensure the count is valid (non-negative number)
+            if (!isNaN(parsedCount) && parsedCount >= 0) {
+              setParsesUsed(parsedCount);
+              console.log(`📊 Loaded parse count: ${parsedCount}/${parsesLimit}`);
+            } else {
+              console.warn('⚠️ Invalid parse count in storage, resetting to 0');
+              await AsyncStorage.setItem(STORAGE_KEYS.PARSES_USED, '0');
+              setParsesUsed(0);
+            }
           }
         }
       } else {
         // First time user, set reset date
+        console.log('🆕 First time user, initializing parse tracking');
         await AsyncStorage.setItem(STORAGE_KEYS.LAST_RESET_DATE, currentDate);
       }
+
+      console.log('✅ Subscription system initialized successfully');
     } catch (error) {
-      console.error('Error initializing subscription:', error);
+      console.error('❌ Error initializing subscription:', error);
+      // Fail safely with free tier defaults
+      setIsPremium(false);
+      setParsesUsed(0);
     } finally {
       setIsLoading(false);
     }
@@ -111,16 +140,29 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   const incrementParseCount = async () => {
-    if (!isPremium) {
-      const newCount = parsesUsed + 1;
-      setParsesUsed(newCount);
+    if (isPremium) {
+      console.log('✨ Premium user - parse not counted');
+      return;
+    }
 
-      try {
-        // Persist to AsyncStorage
-        await AsyncStorage.setItem(STORAGE_KEYS.PARSES_USED, newCount.toString());
-      } catch (error) {
-        console.error('Error saving parse count:', error);
+    const newCount = parsesUsed + 1;
+    setParsesUsed(newCount);
+
+    try {
+      // Persist to AsyncStorage
+      await AsyncStorage.setItem(STORAGE_KEYS.PARSES_USED, newCount.toString());
+      console.log(`📈 Parse count incremented: ${newCount}/${parsesLimit}`);
+
+      // Warn if approaching limit
+      if (newCount === parsesLimit) {
+        console.log('⚠️ User has reached free tier limit!');
+      } else if (newCount === parsesLimit - 1) {
+        console.log('⚠️ User has 1 parse remaining');
       }
+    } catch (error) {
+      console.error('❌ Error saving parse count:', error);
+      // Try to revert the state if we couldn't persist
+      setParsesUsed(parsesUsed);
     }
   };
 

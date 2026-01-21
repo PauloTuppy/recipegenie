@@ -16,7 +16,12 @@ let app: FirebaseApp | null = null;
 let database: Database | null = null;
 
 // Firebase configuration
-// Add these to your .env file:
+// Two configuration options:
+// Option 1: JSON config (recommended for Expo dashboard)
+// EXPO_PUBLIC_FIREBASE_CONFIG={"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}
+// EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key (optional override)
+//
+// Option 2: Individual environment variables (backward compatible)
 // EXPO_PUBLIC_FIREBASE_API_KEY=
 // EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
 // EXPO_PUBLIC_FIREBASE_DATABASE_URL=
@@ -25,17 +30,39 @@ let database: Database | null = null;
 // EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 // EXPO_PUBLIC_FIREBASE_APP_ID=
 
+function getFirebaseConfig() {
+  // Try to parse JSON config first (preferred for Expo dashboard)
+  const jsonConfig = process.env.EXPO_PUBLIC_FIREBASE_CONFIG;
+  if (jsonConfig) {
+    try {
+      const parsedConfig = JSON.parse(jsonConfig);
+
+      // Allow EXPO_PUBLIC_FIREBASE_API_KEY to override the API key in JSON config
+      if (process.env.EXPO_PUBLIC_FIREBASE_API_KEY) {
+        parsedConfig.apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY;
+      }
+
+      return parsedConfig;
+    } catch (error) {
+      console.error('Failed to parse EXPO_PUBLIC_FIREBASE_CONFIG:', error);
+    }
+  }
+
+  // Fallback to individual environment variables
+  return {
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL,
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  };
+}
+
 export function initializeFirebase() {
   if (getApps().length === 0) {
-    const firebaseConfig = {
-      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-      authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL,
-      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-      storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-    };
+    const firebaseConfig = getFirebaseConfig();
 
     // Check if Firebase is configured
     if (!firebaseConfig.apiKey) {
@@ -46,15 +73,17 @@ export function initializeFirebase() {
     try {
       app = initializeApp(firebaseConfig);
       database = getDatabase(app);
-      console.log('Firebase initialized successfully');
+      console.log('✅ Firebase initialized successfully');
+      console.log('📊 Database URL:', firebaseConfig.databaseURL);
       return true;
     } catch (error) {
-      console.error('Failed to initialize Firebase:', error);
+      console.error('❌ Failed to initialize Firebase:', error);
       return false;
     }
   } else {
     app = getApps()[0];
     database = getDatabase(app);
+    console.log('♻️ Firebase already initialized');
     return true;
   }
 }
@@ -68,24 +97,44 @@ export function setUserId(userId: string) {
 
 // Recipes
 export async function saveRecipe(recipe: Recipe): Promise<void> {
-  if (!database) return;
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized, recipe not saved');
+    return;
+  }
 
-  const recipesRef = ref(database, `users/${currentUserId}/recipes/${recipe.id}`);
-  await set(recipesRef, recipe);
+  try {
+    const recipesRef = ref(database, `users/${currentUserId}/recipes/${recipe.id}`);
+    await set(recipesRef, recipe);
+    console.log(`✅ Recipe saved to Firebase: "${recipe.title}" (${recipe.ingredients.length} ingredients)`);
+  } catch (error) {
+    console.error(`❌ Error saving recipe "${recipe.title}":`, error);
+    throw error;
+  }
 }
 
 export async function getRecipes(): Promise<Recipe[]> {
-  if (!database) return [];
-
-  const recipesRef = ref(database, `users/${currentUserId}/recipes`);
-  const snapshot = await get(recipesRef);
-
-  if (snapshot.exists()) {
-    const recipesObj = snapshot.val();
-    return Object.values(recipesObj) as Recipe[];
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized, returning empty recipe list');
+    return [];
   }
 
-  return [];
+  try {
+    const recipesRef = ref(database, `users/${currentUserId}/recipes`);
+    const snapshot = await get(recipesRef);
+
+    if (snapshot.exists()) {
+      const recipesObj = snapshot.val();
+      const recipes = Object.values(recipesObj) as Recipe[];
+      console.log(`✅ Loaded ${recipes.length} recipes from Firebase`);
+      return recipes;
+    }
+
+    console.log('📝 No existing recipes found, starting fresh');
+    return [];
+  } catch (error) {
+    console.error('❌ Error loading recipes from Firebase:', error);
+    return [];
+  }
 }
 
 export async function deleteRecipe(recipeId: string): Promise<void> {
@@ -107,30 +156,48 @@ export async function updateRecipeFavorite(
 
 // Grocery List - Categorized structure
 export async function saveGroceryListToFirebase(groceryList: GroceryList): Promise<void> {
-  if (!database) return;
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized, grocery list not saved');
+    return;
+  }
 
   try {
+    const itemCount = Object.values(groceryList).reduce(
+      (sum, items) => sum + (items?.length || 0),
+      0
+    );
     const groceryRef = ref(database, `users/${currentUserId}/groceryList`);
     await set(groceryRef, groceryList);
+    console.log(`✅ Grocery list saved to Firebase (${itemCount} items, ${Object.keys(groceryList).length} categories)`);
   } catch (error) {
-    console.error('Error saving grocery list to Firebase:', error);
+    console.error('❌ Error saving grocery list to Firebase:', error);
   }
 }
 
 export async function loadGroceryListFromFirebase(): Promise<GroceryList | null> {
-  if (!database) return null;
+  if (!database) {
+    console.warn('⚠️ Firebase not initialized, returning empty grocery list');
+    return {};
+  }
 
   try {
     const groceryRef = ref(database, `users/${currentUserId}/groceryList`);
     const snapshot = await get(groceryRef);
 
     if (snapshot.exists()) {
-      return snapshot.val() as GroceryList;
+      const groceryList = snapshot.val() as GroceryList;
+      const itemCount = Object.values(groceryList).reduce(
+        (sum, items) => sum + (items?.length || 0),
+        0
+      );
+      console.log(`✅ Loaded grocery list from Firebase (${itemCount} items, ${Object.keys(groceryList).length} categories)`);
+      return groceryList;
     }
 
+    console.log('📝 No existing grocery list found, starting fresh');
     return {};
   } catch (error) {
-    console.error('Error loading grocery list from Firebase:', error);
+    console.error('❌ Error loading grocery list from Firebase:', error);
     return null;
   }
 }
