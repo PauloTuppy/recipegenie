@@ -7,12 +7,14 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
+import { useGrocery } from '@/contexts/GroceryContext';
 import type { Ingredient } from '@/types';
 
 const { width } = Dimensions.get('window');
@@ -20,6 +22,7 @@ const { width } = Dimensions.get('window');
 export default function RecipeDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
+  const { addRecipeToGroceryList } = useGrocery();
   const [isFavorite, setIsFavorite] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     {
@@ -92,8 +95,18 @@ export default function RecipeDetailScreen() {
 
   const handleAddToGroceryList = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // TODO: Add to grocery list
-    router.push('/(tabs)/planner');
+
+    // Add recipe ingredients to grocery list
+    addRecipeToGroceryList(params.id || 'temp-id', recipe.title, ingredients);
+
+    Alert.alert(
+      'Added to Grocery List!',
+      `${ingredients.length} ingredients from "${recipe.title}" have been added to your grocery list.`,
+      [
+        { text: 'View Grocery List', onPress: () => router.push('/grocery-list') },
+        { text: 'OK', style: 'cancel' },
+      ]
+    );
   };
 
   return (

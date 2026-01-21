@@ -9,9 +9,12 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
+import { useGrocery } from '@/contexts/GroceryContext';
+import type { Ingredient } from '@/types';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +30,8 @@ interface DayMeals {
 }
 
 export default function PlannerScreen() {
+  const router = useRouter();
+  const { addRecipeToGroceryList, getItemCount } = useGrocery();
   const [selectedDay, setSelectedDay] = useState(0);
 
   // Mock meal plan data for the week
@@ -95,20 +100,97 @@ export default function PlannerScreen() {
   };
 
   const handleGenerateGroceryList = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Count total meals in the plan
+    let totalMeals = 0;
+    weekData.forEach((day) => {
+      totalMeals += Object.keys(day.meals).length;
+    });
+
+    if (totalMeals === 0) {
+      Alert.alert('No Meals Planned', 'Add meals to your week plan first before generating a grocery list.');
+      return;
+    }
+
     Alert.alert(
       'Generate Grocery List',
-      'Generate a grocery list for the entire week?',
+      `Generate a grocery list from ${totalMeals} planned meals for the entire week?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Generate',
           onPress: () => {
-            // TODO: Implement grocery list generation
+            generateWeeklyGroceryList();
           },
         },
       ]
     );
+  };
+
+  const generateWeeklyGroceryList = () => {
+    let addedRecipes = 0;
+
+    // For each day, for each meal, add ingredients to grocery list
+    weekData.forEach((day) => {
+      Object.entries(day.meals).forEach(([mealType, mealName]) => {
+        if (mealName) {
+          // In a real app, you would fetch the recipe by ID and get its ingredients
+          // For demo, we'll create mock ingredients based on the meal name
+          const mockIngredients = generateMockIngredientsForMeal(mealName);
+          const recipeId = `${day.date}-${mealType}`;
+
+          addRecipeToGroceryList(recipeId, mealName, mockIngredients);
+          addedRecipes++;
+        }
+      });
+    });
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    Alert.alert(
+      'Grocery List Generated!',
+      `Added ingredients from ${addedRecipes} recipes to your grocery list.`,
+      [
+        { text: 'View Grocery List', onPress: () => router.push('/grocery-list') },
+        { text: 'OK', style: 'cancel' },
+      ]
+    );
+  };
+
+  // Helper function to generate mock ingredients for demo
+  const generateMockIngredientsForMeal = (mealName: string): Ingredient[] => {
+    // This would normally fetch from a database
+    // For demo, we return realistic ingredients based on meal type
+    const ingredients: Ingredient[] = [];
+
+    if (mealName.toLowerCase().includes('chicken')) {
+      ingredients.push(
+        { id: `${Date.now()}-1`, name: 'Chicken Breast', quantity: 1, unit: 'lb', category: 'Meat & Seafood' },
+        { id: `${Date.now()}-2`, name: 'Olive Oil', quantity: 2, unit: 'tbsp', category: 'Pantry' },
+        { id: `${Date.now()}-3`, name: 'Garlic', quantity: 2, unit: 'cloves', category: 'Produce' }
+      );
+    } else if (mealName.toLowerCase().includes('egg')) {
+      ingredients.push(
+        { id: `${Date.now()}-1`, name: 'Eggs', quantity: 2, unit: '', category: 'Dairy & Eggs' },
+        { id: `${Date.now()}-2`, name: 'Avocado', quantity: 1, unit: '', category: 'Produce' },
+        { id: `${Date.now()}-3`, name: 'Bread', quantity: 2, unit: 'slices', category: 'Bakery' }
+      );
+    } else if (mealName.toLowerCase().includes('salad')) {
+      ingredients.push(
+        { id: `${Date.now()}-1`, name: 'Lettuce', quantity: 1, unit: 'head', category: 'Produce' },
+        { id: `${Date.now()}-2`, name: 'Tomatoes', quantity: 2, unit: '', category: 'Produce' },
+        { id: `${Date.now()}-3`, name: 'Cucumber', quantity: 1, unit: '', category: 'Produce' }
+      );
+    } else {
+      // Generic ingredients
+      ingredients.push(
+        { id: `${Date.now()}-1`, name: 'Mixed Vegetables', quantity: 2, unit: 'cups', category: 'Produce' },
+        { id: `${Date.now()}-2`, name: 'Olive Oil', quantity: 1, unit: 'tbsp', category: 'Pantry' }
+      );
+    }
+
+    return ingredients;
   };
 
   const currentDay = weekData[selectedDay];

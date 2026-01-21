@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,24 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
-import type { GroceryList, GroceryCategory, GroceryItem } from '@/types';
+import { useGrocery } from '@/contexts/GroceryContext';
+import type { GroceryCategory, GroceryItem } from '@/types';
 
 export default function GroceryListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const {
+    groceryList,
+    toggleIngredientCheck,
+    updateIngredientQuantity,
+    removeIngredientFromGroceryList,
+    clearCheckedItems,
+    getItemCount,
+    getCheckedCount,
+  } = useGrocery();
 
-  // Mock grocery list data (organized by category)
-  const [groceryList, setGroceryList] = useState<GroceryList>({
+  // Remove mock data - using context now
+  /* const [groceryList, setGroceryList] = useState<GroceryList>({
     Produce: [
       {
         id: '1',
@@ -83,7 +93,7 @@ export default function GroceryListScreen() {
         checked: false,
       },
     ],
-  });
+  }); */
 
   const handleBack = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -92,43 +102,25 @@ export default function GroceryListScreen() {
 
   const toggleItem = (category: GroceryCategory, itemId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setGroceryList((prev) => ({
-      ...prev,
-      [category]: prev[category]?.map((item: GroceryItem) =>
-        item.id === itemId ? { ...item, checked: !item.checked } : item
-      ),
-    }));
+    toggleIngredientCheck(category, itemId);
   };
 
   const incrementQuantity = (category: GroceryCategory, itemId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setGroceryList((prev) => ({
-      ...prev,
-      [category]: prev[category]?.map((item: GroceryItem) =>
-        item.id === itemId ? { ...item, quantity: item.quantity + 1 } : item
-      ),
-    }));
+    updateIngredientQuantity(category, itemId, 1);
   };
 
   const decrementQuantity = (category: GroceryCategory, itemId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setGroceryList((prev) => ({
-      ...prev,
-      [category]: prev[category]?.map((item: GroceryItem) =>
-        item.id === itemId && item.quantity > 1 ? { ...item, quantity: item.quantity - 1 } : item
-      ),
-    }));
+    updateIngredientQuantity(category, itemId, -1);
   };
 
   const deleteItem = (category: GroceryCategory, itemId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setGroceryList((prev) => ({
-      ...prev,
-      [category]: prev[category]?.filter((item: GroceryItem) => item.id !== itemId),
-    }));
+    removeIngredientFromGroceryList(category, itemId);
   };
 
-  const clearCheckedItems = () => {
+  const handleClearCheckedItems = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Clear Checked Items', 'Remove all checked items from the list?', [
       { text: 'Cancel', style: 'cancel' },
@@ -136,15 +128,7 @@ export default function GroceryListScreen() {
         text: 'Clear',
         style: 'destructive',
         onPress: () => {
-          const newList: GroceryList = {};
-          Object.keys(groceryList).forEach((category) => {
-            const items = groceryList[category as GroceryCategory];
-            const uncheckedItems = items?.filter((item: GroceryItem) => !item.checked);
-            if (uncheckedItems && uncheckedItems.length > 0) {
-              newList[category as GroceryCategory] = uncheckedItems;
-            }
-          });
-          setGroceryList(newList);
+          clearCheckedItems();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         },
       },
@@ -175,14 +159,8 @@ export default function GroceryListScreen() {
   };
 
   const categories = Object.keys(groceryList) as GroceryCategory[];
-  const totalItems = categories.reduce(
-    (sum, cat) => sum + (groceryList[cat]?.length || 0),
-    0
-  );
-  const checkedItems = categories.reduce(
-    (sum, cat) => sum + (groceryList[cat]?.filter((item: GroceryItem) => item.checked).length || 0),
-    0
-  );
+  const totalItems = getItemCount();
+  const checkedItems = getCheckedCount();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -278,7 +256,7 @@ export default function GroceryListScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity
           style={styles.clearButton}
-          onPress={clearCheckedItems}
+          onPress={handleClearCheckedItems}
           disabled={checkedItems === 0}
           activeOpacity={0.8}
         >
