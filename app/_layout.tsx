@@ -8,8 +8,12 @@ import { initializeFirebase } from '@/services/firebase';
 
 export default function RootLayout() {
   useEffect(() => {
-    // Initialize Firebase on app start
-    initializeFirebase();
+    // Initialize Firebase and User Identity on app start
+    const init = async () => {
+      await initializeFirebase();
+      await import('@/services/firebase').then(m => m.initializeUserIdentity());
+    };
+    init();
   }, []);
 
   return (
@@ -17,30 +21,30 @@ export default function RootLayout() {
       <RecipeProvider>
         <GroceryProvider>
           <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="recipe/[id]"
-          options={{
-            headerShown: false,
-            presentation: 'card'
-          }}
-        />
-        <Stack.Screen
-          name="paywall"
-          options={{
-            presentation: 'modal',
-            headerShown: false
-          }}
-        />
-        <Stack.Screen
-          name="grocery-list"
-          options={{
-            headerShown: false,
-            presentation: 'card'
-          }}
-        />
-        </Stack>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="recipe/[id]"
+              options={{
+                headerShown: false,
+                presentation: 'card'
+              }}
+            />
+            <Stack.Screen
+              name="paywall"
+              options={{
+                presentation: 'modal',
+                headerShown: false
+              }}
+            />
+            <Stack.Screen
+              name="grocery-list"
+              options={{
+                headerShown: false,
+                presentation: 'card'
+              }}
+            />
+          </Stack>
         </GroceryProvider>
       </RecipeProvider>
     </SubscriptionProvider>

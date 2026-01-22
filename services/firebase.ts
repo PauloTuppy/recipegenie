@@ -10,6 +10,7 @@ import {
   onValue,
   Database,
 } from 'firebase/database';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Recipe, MealPlan, GroceryItem, GroceryList, SavedVideoSearch } from '@/types';
 
 let app: FirebaseApp | null = null;
@@ -89,10 +90,43 @@ export function initializeFirebase() {
 }
 
 // User ID management (use actual auth in production)
-let currentUserId = 'demo_user'; // In production, get from authentication
+let currentUserId = 'demo_user';
+
+/**
+ * Initialize the user identity.
+ * In a real production app, this would integrate with Firebase Auth.
+ * For now, we generate/retrieve a persistent unique ID for each device.
+ */
+export async function initializeUserIdentity() {
+  try {
+    const STORAGE_KEY = '@recipegenie_anonymous_id';
+    const storedId = await AsyncStorage.getItem(STORAGE_KEY);
+
+    if (storedId) {
+      currentUserId = storedId;
+      console.log('👤 Using existing anonymous ID:', currentUserId);
+    } else {
+      // Generate a new unique ID
+      const newId = 'user_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      await AsyncStorage.setItem(STORAGE_KEY, newId);
+      currentUserId = newId;
+      console.log('🆕 Generated new anonymous ID:', currentUserId);
+    }
+
+    return currentUserId;
+  } catch (error) {
+    console.warn('⚠️ Failed to manage user identity, falling back to demo_user');
+    currentUserId = 'demo_user';
+    return currentUserId;
+  }
+}
 
 export function setUserId(userId: string) {
   currentUserId = userId;
+}
+
+export function getCurrentUserId() {
+  return currentUserId;
 }
 
 // Recipes
@@ -305,7 +339,7 @@ export async function getUserPreference(key: string): Promise<any | null> {
 
 // Real-time listeners
 export function subscribeToRecipes(callback: (recipes: Recipe[]) => void): () => void {
-  if (!database) return () => {};
+  if (!database) return () => { };
 
   const recipesRef = ref(database, `users/${currentUserId}/recipes`);
   const unsubscribe = onValue(recipesRef, (snapshot) => {

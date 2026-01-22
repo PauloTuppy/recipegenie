@@ -43,8 +43,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔄 Initializing subscription system...');
 
-      // Initialize RevenueCat
-      const rcInitialized = await initializeRevenueCat();
+      // Initialize user identity first
+      const userId = await import('@/services/firebase').then(m => m.initializeUserIdentity());
+
+      // Initialize RevenueCat with the userId
+      const rcInitialized = await initializeRevenueCat(userId);
 
       if (rcInitialized) {
         // Check premium status
@@ -77,7 +80,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       if (lastResetDate) {
         const daysSinceReset = Math.floor(
           (new Date(currentDate).getTime() - new Date(lastResetDate).getTime()) /
-            (1000 * 60 * 60 * 24)
+          (1000 * 60 * 60 * 24)
         );
 
         console.log(`⏰ Days since last reset: ${daysSinceReset}`);

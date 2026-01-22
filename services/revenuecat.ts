@@ -7,7 +7,7 @@ import Purchases, {
 const ENTITLEMENT_ID = 'premium';
 
 // Initialize RevenueCat
-export async function initializeRevenueCat() {
+export async function initializeRevenueCat(userId?: string) {
   const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 
   // Check if API key is configured
@@ -29,7 +29,10 @@ export async function initializeRevenueCat() {
   }
 
   try {
-    await Purchases.configure({ apiKey });
+    await Purchases.configure({
+      apiKey,
+      appUserID: userId
+    });
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ RevenueCat initialized successfully');
     console.log('🔑 Using API key:', apiKey.substring(0, 15) + '...');
